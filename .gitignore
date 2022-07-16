@@ -1,9 +1,10 @@
 vendor/
 .vscode/
-.env
+.env*
 composer.lock
 .idea/
 _gsdata_/
 *.bak
 test_file.txt
 .phpunit.result.cache
+

@@ -11,6 +11,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Subscriber\Oauth\Oauth1;
 use GuzzleHttp\Exception\ClientException;
 
+
 class MeocloudClient {
  
     private $client;
@@ -40,7 +41,7 @@ class MeocloudClient {
     protected function _invoke($uri, $http_met = 'GET', $args=[])
     {
         $resp = null;
-        if (!empty($args['body'])) {
+        if (!empty($args['body']) && $args['encode_body'] == TRUE) {
             $args['body'] = json_encode($args['body']);
         }
         $args = array_merge($args,['auth' => 'oauth']);
@@ -55,29 +56,42 @@ class MeocloudClient {
         return $resp;
     }
 
-    protected function _invoke_json($uri, $http_met = 'GET', $args=[])
-	{
-		$resp = $this->_invoke($uri, $http_met, $args);
-		return json_decode($resp->getBody()->getContents());
-	}
+    protected function _invoke_json($uri, $http_met = 'GET', $args=[],$decode_resp=TRUE,$encode_body=TRUE)
+    {
+        $args['encode_body'] = $encode_body;
+        $resp = $this->_invoke($uri, $http_met, $args);
+        $body = $resp->getBody();
+        $body = $body->getContents();
+        if ($decode_resp) {
+            $body = json_decode($body);
+        }
+        return $body;
+    }
 
 
 
 
     public function get_metadata($path='',$params=[]) {
         $args['params'] = $params;
-        return $this->_invoke_json('Metadata/meocloud/' . $path,'GET',$args);
+        return $this->_invoke_json('Metadata/meocloud' . $path,'GET',$args);
     }
-
+ 
     public function get_file($filename) {
         $complete_uri = self::MEOCLOUD_CONTENT_ENDPOINT . '/Files/meocloud/' . $filename;
         $resp = $this->_invoke( $complete_uri,'GET',['stream' => true]);
-        return file_put_contents($filename,$resp->getBody()->getContents());
+        
+        $content = $resp->getBody();
+        return $content;
+        #return file_put_contents($filename,$resp->getBody()->getContents());
     }
 
     public function send_file($filename) {
-        $complete_uri = self::MEOCLOUD_CONTENT_ENDPOINT . '/Files/meocloud/' . $filename;
-    	return $this->_invoke_json($complete_uri,'PUT',['body'=>file_get_contents($filename), 'stream'=>TRUE]);
+    	return $this->send_data($filename,file_get_contents($filename));
+   }
+
+   public function send_data($newfilename,$data) {
+	   $complete_uri = self::MEOCLOUD_CONTENT_ENDPOINT . '/Files/meocloud/' . $newfilename;
+	   return $this->_invoke_json($complete_uri,'PUT',['body'=>$data, 'stream'=>TRUE],TRUE,FALSE);
    }
 
     public function delete_file($filename) {
@@ -107,19 +121,19 @@ class MeocloudClient {
         return $this->_invoke_json('Account/Info');
     }
 
-    public function search($query,$file_limit=1000,$include_deleted=FALSE,$mime_type='') {
-        $pathinfo = pathinfo($query);
-        $path = $pathinfo['dirname'];
+    public function search($path,$query,$mime_type,$file_limit=1000,$include_deleted=FALSE) {
+        //$dirname = substr($query,0,strrchr($query, '/')); 
+        //$basename = substr($query,strrchr($query,'/'),strlen($query));
         $args['params'] = [
-            'search' => $pathinfo['basename'],
+            'search' => $query,
             'file_limit' => $file_limit,
             'include_deleted' => $include_deleted,
-  //          'mime_type' => $mime_type
+            'mime_type' => $mime_type
         ];
-     //   $args['debug'] = true;
+        $args['debug'] = true;
         $response = null;
         try {
-            $response = $this->_invoke_json("Search/meocloud/$path?search={$pathinfo['basename']}", 'GET', $args);
+            $response = $this->_invoke_json("Search/meocloud/$path", 'GET', $args);
         } catch (\Exception $e) {
             //echo ($e->getMessage());
             if ($e->getCode() == 404) {

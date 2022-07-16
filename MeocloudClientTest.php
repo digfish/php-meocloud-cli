@@ -29,14 +29,19 @@ final class MeocloudClientTest extends TestCase {
     }
 
     public function testSendFile() {
-		file_put_contents(self::$filename, self::$faker->text);
-		$metadata = $this->client->send_file(self::$filename);
+    	if (file_exists(self::$filename)) {
+			unlink(self::$filename);
+		}
+    	file_put_contents(self::$filename, self::$faker->text(100));
+		$this->client->send_file(self::$filename);
 		$this->assertEquals(200, $this->client->lastStatus);
+		unlink(self::$filename);
 	}
 
     public function testGetFile() {
         $success = $this->client->get_file(self::$filename);
-        $this->assertEquals(200, $this->client->lastStatus);
+        $file_content = $this->assertEquals(200, $this->client->lastStatus);
+        file_put_contents(self::$filename, $file_content);
     }
 
 
@@ -57,7 +62,7 @@ final class MeocloudClientTest extends TestCase {
     }
 
     public function testSearch() {
-        $this->client->search('php');
+        $this->client->search('created','dropbox', 'image/png');
         $this->assertEquals($this->client->lastStatus,200);
     }
 
